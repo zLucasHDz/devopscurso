@@ -1,6 +1,8 @@
 from fastapi import FastAPI
 from datetime import datetime
 
+import requests
+
 LISTA_TAREFAS = []
 APP = FastAPI()
 
@@ -14,13 +16,19 @@ def nova_tarefa(id: int, titulo: str, descricao: str):
         "criado_em": datetime.now()
     }
 
+def verificar_existencia_tarefa(id: int):
+    """Função auxiliar para verificar a existência de uma tarefa com base no seu ID"""
+    for tarefa in LISTA_TAREFAS:
+        if id == tarefa['id']:
+            return True
+    return False
+
 @APP.get("/")
 def index():
     return "Olá, DevOps!"
 
 @APP.get("/tarefas")
 def listar_tarefas():
-
     # Lista tarefas (somente id e titulo)
     if len(LISTA_TAREFAS) == 0:
         return LISTA_TAREFAS
@@ -35,9 +43,6 @@ def listar_tarefas():
 
 @APP.get("/tarefas/{id}")
 def listar_tarefa_especifica(id: int):
-    global LISTA_TAREFAS
-    LISTA_TAREFAS.append(nova_tarefa(0, "nova tarefa", "descricao nova tarefa"))
-
     mensagem_padrao = {"mensagem": "Não existe nenhuma tarefa"}
     if len(LISTA_TAREFAS) == 0:
         return mensagem_padrao
@@ -48,42 +53,6 @@ def listar_tarefa_especifica(id: int):
     
     return mensagem_padrao
 
-
-@APP.post("/tarefas")
-def recebe_tarefas(id: int, titulo: str, descricao: str):
-
-    for tarefa in LISTA_TAREFAS:
-        if tarefa["id"] == id:
-            return "TAREFA JÁ EXISTE"
-
-    LISTA_TAREFAS.append(nova_tarefa(id, titulo, descricao))
-
-    return "OK"
-
-@APP.put("/tarefas/{id}")
-def informa_tarefa(id: int, titulo: str, descricao: str, concluido: bool):
-
-    for tarefa in LISTA_TAREFAS:
-        if tarefa["id"] == id:
-            tarefa["titulo"] = titulo
-            tarefa["descricao"] = descricao
-            tarefa["concluido"] = concluido
-            return "OK"
-
-    return "TAREFA NÃO EXISTE"
-
-@APP.delete("/tarefas/{id}")
-def remover_tarefa(id: int):
-
-    for tarefa in LISTA_TAREFAS:
-        if tarefa["id"] == id:
-            LISTA_TAREFAS.remove(tarefa)
-            return "OK"
-
-    return "TAREFA NÃO EXISTE"
-
-        
-        
 # Implementar!
 # @APP.post("/tarefas")
 # Rota /tarefas (POST)
@@ -96,6 +65,21 @@ def remover_tarefa(id: int):
 #       - Retorna "OK" se a tarefa foi criada
 #       - Se a tarefa existir, retornar "TAREFA JÁ EXISTE"
 
+@APP.post("/tarefas")
+def criar_tarefa(id: int, titulo: str, descricao: str):
+    global LISTA_TAREFAS
+
+    tarefa_existe = verificar_existencia_tarefa(id)
+
+    if tarefa_existe:
+        return {"mensagem": "TAREFA JÁ EXISTE!"}
+    
+    nova = nova_tarefa(id, titulo, descricao)
+
+    LISTA_TAREFAS.append(nova)
+
+    return {"mensagem": "OK"}
+
 # @APP.put("/tarefas/{id}")
 # Rota /tarefas/{id} (PUT)
 #   Entrada: id da tarefa (int), titulo da tarefa (str), descrição da tarefa (str) e concluido (bool)
@@ -105,6 +89,35 @@ def remover_tarefa(id: int):
 #   # Saída:
 #       - Retorna "OK" se a tarefa foi atualizada
 #       - Se a tarefa NÃO existir, retornar "TAREFA NÃO EXISTE"
+@APP.put("/tarefas/{id}")
+def atualizar_tarefa(id: int, titulo: str = "", descricao: str = "", concluido: bool = False):
+    global LISTA_TAREFAS
+
+    tarefa_existe = verificar_existencia_tarefa(id)
+
+    if not tarefa_existe:
+        return {"mensagem": "TAREFA NÃO EXISTE!"}
+    
+    tarefa = None
+    for indice in range(len(LISTA_TAREFAS)):
+        tarefa = LISTA_TAREFAS[indice]
+
+        # Sai do loop
+        if tarefa['id'] == id:
+            break
+    
+    if titulo != "":
+        LISTA_TAREFAS[indice]['titulo'] = titulo
+    
+    if descricao !=  "": 
+        LISTA_TAREFAS[indice]['descricao'] = descricao
+    
+    if concluido == True:
+        requests.post(f"http://localhost:8001/notificar?titulo={tarefa['titulo']}&data_finalizacao={datetime.now()}")
+
+    LISTA_TAREFAS[indice]['concluido'] = concluido
+
+    return {"mensagem": "OK"}
 
 # @APP.delete("/tarefas")
 # Rota /tarefas/{id} (DELETE)
@@ -117,3 +130,23 @@ def remover_tarefa(id: int):
 #   # Saída:
 #       - Retorna "OK" se a tarefa foi removida
 #       - Se a tarefa NÃO existir, retornar "TAREFA NÃO EXISTE"
+@APP.delete("/tarefas/{id}")
+def apagar_tarefa(id: int):
+    global LISTA_TAREFAS
+
+    tarefa_existe = verificar_existencia_tarefa(id)
+
+    if not tarefa_existe:
+        return {"mensagem": "TAREFA NÃO EXISTE"}
+
+    tarefa = None
+    for indice in range(len(LISTA_TAREFAS)):
+        tarefa = LISTA_TAREFAS[indice]
+
+        # Sai do loop
+        if tarefa['id'] == id:
+            break
+    
+    LISTA_TAREFAS.pop(indice)
+
+    return {"mensagem": "OK"}
