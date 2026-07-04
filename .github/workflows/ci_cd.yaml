@@ -15,7 +15,7 @@ jobs:
       # Equivalente a git clone
       - uses: actions/checkout@v4
       - name: 'Instalação de dependências'
-        run: pip install -r requirements.txt
+        run: pip install -r requiriments.txt
       - name: 'Testes unitários'
         run: pytest
       - name: 'Cobertura de código'
