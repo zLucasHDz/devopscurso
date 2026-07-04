@@ -21,4 +21,4 @@ jobs:
       - name: 'Análise estática'
         run : bandit -r app/
       - name: 'Linting'
-        run : pylint app/ | | true
+        run : pylint app/ || true
