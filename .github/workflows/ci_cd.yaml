@@ -1,0 +1,17 @@
+name: 'Pipeline 04/07/26'
+
+on:
+  #Habilita botão na interface Web para acionar manualmente a pipeline
+  workflow_dispatch:
+
+jobs:
+  integracao:
+    name:'Integração'
+    runs-on:ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: 'Instalação de Dependências'
+        run: pip install -r requiriments.txt
+      - name: 'Testes unitários'
+        run: pytest 
+
