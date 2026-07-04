@@ -53,18 +53,6 @@ def listar_tarefa_especifica(id: int):
     
     return mensagem_padrao
 
-# Implementar!
-# @APP.post("/tarefas")
-# Rota /tarefas (POST)
-#   Entrada: id da tarefa (int), titulo da tarefa (str) e descrição da tarefa (str)
-#   Funcionamento:
-#       - Recebe os dados como parâmetro de requisição
-#       - Cria uma nova tarefa usando a função `nova_tarefa`
-#       - Adiciona nova tarefa a LISTA_TAREFAS
-#   # Saída:
-#       - Retorna "OK" se a tarefa foi criada
-#       - Se a tarefa existir, retornar "TAREFA JÁ EXISTE"
-
 @APP.post("/tarefas")
 def criar_tarefa(id: int, titulo: str, descricao: str):
     global LISTA_TAREFAS
@@ -80,15 +68,6 @@ def criar_tarefa(id: int, titulo: str, descricao: str):
 
     return {"mensagem": "OK"}
 
-# @APP.put("/tarefas/{id}")
-# Rota /tarefas/{id} (PUT)
-#   Entrada: id da tarefa (int), titulo da tarefa (str), descrição da tarefa (str) e concluido (bool)
-#   Funcionamento:
-#       - Recebe os dados como parâmetro de requisição
-#       - Atualiza informações da tarefa de id específico
-#   # Saída:
-#       - Retorna "OK" se a tarefa foi atualizada
-#       - Se a tarefa NÃO existir, retornar "TAREFA NÃO EXISTE"
 @APP.put("/tarefas/{id}")
 def atualizar_tarefa(id: int, titulo: str = "", descricao: str = "", concluido: bool = False):
     global LISTA_TAREFAS
@@ -113,23 +92,12 @@ def atualizar_tarefa(id: int, titulo: str = "", descricao: str = "", concluido: 
         LISTA_TAREFAS[indice]['descricao'] = descricao
     
     if concluido == True:
-        requests.post(f"http://localhost:8001/notificar?titulo={tarefa['titulo']}&data_finalizacao={datetime.now()}")
+        requests.post(f"http://localhost:8002/notificar?titulo={tarefa['titulo']}&data_finalizacao={datetime.now()}")
 
     LISTA_TAREFAS[indice]['concluido'] = concluido
 
     return {"mensagem": "OK"}
 
-# @APP.delete("/tarefas")
-# Rota /tarefas/{id} (DELETE)
-#   Entrada: id da tarefa (int)
-#   Funcionamento:
-#       - Recebe os dados como parâmetro de requisição
-#       - Busca pela tarefa com base no ID
-#       - Se tarefa existir, remover de LISTA_TAREFAS
-#       - Se NÃO existir, retorna "TAREFA NÃO EXISTE"
-#   # Saída:
-#       - Retorna "OK" se a tarefa foi removida
-#       - Se a tarefa NÃO existir, retornar "TAREFA NÃO EXISTE"
 @APP.delete("/tarefas/{id}")
 def apagar_tarefa(id: int):
     global LISTA_TAREFAS
