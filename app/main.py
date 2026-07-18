@@ -1,47 +1,29 @@
-import logging
-from datetime import datetime
-import requests
 from fastapi import FastAPI
+from fastapi.exceptions import HTTPException
 
+from datetime import datetime
 
-# ================= LOGS =================
-
-LOGGER = logging.getLogger("devops")
-LOGGER.setLevel(logging.INFO)
-LOGGER.propagate = False
-
-if not LOGGER.handlers:
-    stream_handler = logging.StreamHandler()
-
-    file_handler = logging.FileHandler(
-        f"{LOGGER.name}.log",
-        encoding="UTF-8"
-    )
-
-    formatador = logging.Formatter(
-        fmt=(
-            "%(name)s | %(levelname)s | %(asctime)s | "
-            "%(filename)s:%(lineno)d | %(funcName)s | %(message)s"
-        )
-    )
-
-    stream_handler.setFormatter(formatador)
-    file_handler.setFormatter(formatador)
-
-    LOGGER.addHandler(stream_handler)
-    LOGGER.addHandler(file_handler)
-
-# =============== FIM LOGS ===============
-
+import requests
+import logging
 
 LISTA_TAREFAS = []
 APP = FastAPI()
+LOGGER = logging.getLogger("DevOps")
+LOGGER.setLevel(logging.INFO)
 
+stream_handler = logging.StreamHandler()
+file_handler   = logging.FileHandler("api.log", encoding='utf-8')
+fmt = logging.Formatter(fmt="%(name)s | %(asctime)s | %(filename)s:%(lineno)s | %(levelname)s | %(message)s")
+
+stream_handler.setFormatter(fmt)
+file_handler.setFormatter(fmt)
+
+LOGGER.addHandler(stream_handler)
+LOGGER.addHandler(file_handler)
 
 def nova_tarefa(id: int, titulo: str, descricao: str):
-    """Cria uma nova tarefa usando um dicionário."""
-
-    return {
+    """Função auxiliar para criar uma tarefa usando dicionário (`dict`)"""
+    tarefa = {
         "id": id,
         "titulo": titulo,
         "descricao": descricao,
@@ -49,137 +31,128 @@ def nova_tarefa(id: int, titulo: str, descricao: str):
         "criado_em": datetime.now()
     }
 
+    LOGGER.debug(f"Criando tarefa='{tarefa}'")
+
+    return tarefa
 
 def verificar_existencia_tarefa(id: int):
-    """Verifica a existência de uma tarefa com base no ID."""
-
+    """Função auxiliar para verificar a existência de uma tarefa com base no seu ID"""
     for tarefa in LISTA_TAREFAS:
-        if id == tarefa["id"]:
+        if id == tarefa['id']:
             return True
-
     return False
-
 
 @APP.get("/")
 def index():
+    LOGGER.info(f"Rota '/' foi acessada")
     return "Olá, DevOps!"
-
 
 @APP.get("/tarefas")
 def listar_tarefas():
-    """Lista o ID e o título das tarefas."""
+    # Lista tarefas (somente id e titulo)
+    
+    LOGGER.info(f"Rota '/tarefas' foi acessada")
+
+    if len(LISTA_TAREFAS) == 0:
+        return LISTA_TAREFAS
 
     tarefas = []
-
+    
     for tarefa in LISTA_TAREFAS:
-        info = {
-            "id": tarefa["id"],
-            "titulo": tarefa["titulo"]
-        }
-
+        info = {"id": tarefa['id'], "titulo": tarefa['titulo']}
         tarefas.append(info)
 
     return tarefas
 
-
 @APP.get("/tarefas/{id}")
 def listar_tarefa_especifica(id: int):
-    """Busca uma tarefa pelo seu ID."""
+    mensagem_padrao = {"mensagem": "Não existe nenhuma tarefa"}
+    if len(LISTA_TAREFAS) == 0:
+        LOGGER.error(f"Rota '/tarefas/{id} acessada. Mensagem: {mensagem_padrao['mensagem']}")
+        return mensagem_padrao
+    
+    # ID da tarefa é o índice na lista
+    if id >= 0 and id < len(LISTA_TAREFAS):
+        LOGGER.info(f"Rota '/tarefas/{id} acessada.")
+        return LISTA_TAREFAS[id]
+    
+    return mensagem_padrao
 
-    for tarefa in LISTA_TAREFAS:
-        if tarefa["id"] == id:
-            return tarefa
-
-    LOGGER.warning("Tarefa não encontrada. ID: %s", id)
-
-    return {"mensagem": "Não existe nenhuma tarefa com esse ID"}
-
-
-@APP.post("/tarefas")
+@APP.post("/tarefas", status_code=201)
 def criar_tarefa(id: int, titulo: str, descricao: str):
-    """Cria uma nova tarefa."""
+    global LISTA_TAREFAS
 
-    if verificar_existencia_tarefa(id):
-        LOGGER.warning("Tentativa de criar tarefa já existente. ID: %s", id)
+    tarefa_existe = verificar_existencia_tarefa(id)
 
-        return {"mensagem": "TAREFA JÁ EXISTE!"}
-
+    if tarefa_existe:
+        ex = HTTPException(status_code=202, detail={"mensagem": "TAREFA JÁ EXISTE!"})
+        LOGGER.error(f"Rota POST '/tarefas/' acessada. Tarefa já existe.")
+        raise ex
+    
     nova = nova_tarefa(id, titulo, descricao)
 
     LISTA_TAREFAS.append(nova)
 
-    LOGGER.info("Tarefa criada. ID: %s", id)
+    LOGGER.info(f"Rota POST '/tarefas' acessada. Tarefa id={id} criada.")
 
     return {"mensagem": "OK"}
 
-
 @APP.put("/tarefas/{id}")
-def atualizar_tarefa(
-    id: int,
-    titulo: str = "",
-    descricao: str = "",
-    concluido: bool = False
-):
-    """Atualiza uma tarefa pelo seu ID."""
+def atualizar_tarefa(id: int, titulo: str = "", descricao: str = "", concluido: bool = False):
+    global LISTA_TAREFAS
 
-    for tarefa in LISTA_TAREFAS:
-        if tarefa["id"] != id:
-            continue
+    tarefa_existe = verificar_existencia_tarefa(id)
 
-        if titulo != "":
-            tarefa["titulo"] = titulo
+    if not tarefa_existe:
+        LOGGER.error(f"Rota PUT '/tarefas/{id}' acessada. Tarefa NÃO existe.")
+        return {"mensagem": "TAREFA NÃO EXISTE!"}
+    
+    tarefa = None
+    for indice in range(len(LISTA_TAREFAS)):
+        tarefa = LISTA_TAREFAS[indice]
 
-        if descricao != "":
-            tarefa["descricao"] = descricao
+        # Sai do loop
+        if tarefa['id'] == id:
+            break
+    
+    if titulo != "":
+        LISTA_TAREFAS[indice]['titulo'] = titulo
+    
+    if descricao !=  "":
+        LISTA_TAREFAS[indice]['descricao'] = descricao
+    
+    if concluido == True:
+        requests.post(
+            f"http://notificacoes:8000/notificar?titulo={tarefa['titulo']}&data_finalizacao={datetime.now()}",
+            timeout=10
+        )
 
-        tarefa["concluido"] = concluido
+    LISTA_TAREFAS[indice]['concluido'] = concluido
+    LOGGER.debug(f"Tarefa atualizada = {LISTA_TAREFAS[indice]}")
+    LOGGER.info(f"Rota PUT '/tarefas/{id}' acessada. Tarefa id={id} atualizada.")
 
-        if concluido:
-            try:
-                resposta = requests.post(
-                    "http://notificacoes:8000/notificar",
-                    params={
-                        "titulo": tarefa["titulo"],
-                        "data_finalizacao": datetime.now().isoformat()
-                    },
-                    timeout=10
-                )
-
-                resposta.raise_for_status()
-
-                LOGGER.info(
-                    "Notificação enviada para a tarefa. ID: %s",
-                    id
-                )
-
-            except requests.RequestException as erro:
-                LOGGER.error(
-                    "Erro ao enviar notificação da tarefa ID %s: %s",
-                    id,
-                    erro
-                )
-
-        LOGGER.info("Tarefa atualizada. ID: %s", id)
-
-        return {"mensagem": "OK"}
-
-    LOGGER.warning("Tentativa de atualizar tarefa inexistente. ID: %s", id)
-
-    return {"mensagem": "TAREFA NÃO EXISTE!"}
-
+    return {"mensagem": "OK"}
 
 @APP.delete("/tarefas/{id}")
 def apagar_tarefa(id: int):
-    """Remove uma tarefa pelo seu ID."""
+    global LISTA_TAREFAS
 
-    for indice, tarefa in enumerate(LISTA_TAREFAS):
-        if tarefa["id"] == id:
-            LISTA_TAREFAS.pop(indice)
+    tarefa_existe = verificar_existencia_tarefa(id)
 
-            LOGGER.info("Tarefa apagada. ID: %s", id)
+    if not tarefa_existe:
+        LOGGER.error(f"Rota PUT '/tarefas/{id}' acessada. Tarefa NÃO existe.")
+        return {"mensagem": "TAREFA NÃO EXISTE"}
 
-            return {"mensagem": "OK"}
+    tarefa = None
+    for indice in range(len(LISTA_TAREFAS)):
+        tarefa = LISTA_TAREFAS[indice]
 
-    LOGGER.warning("Tentativa de apagar tarefa inexistente. ID: %s", id)
+        # Sai do loop
+        if tarefa['id'] == id:
+            break
+    
+    LISTA_TAREFAS.pop(indice)
 
-    return {"mensagem": "TAREFA NÃO EXISTE!"}
+    LOGGER.info(f"Rota DELETE '/tarefas/{id}' acessada. Tarefa id={id} removida.")
+
+    return {"mensagem": "OK"}
